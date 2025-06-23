@@ -1,41 +1,20 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Polygon, useMapEvents } from 'react-leaflet';
+import { FeatureGroup } from 'react-leaflet'; // Import FeatureGroup
+import { EditControl } from 'react-leaflet-draw'; // Import EditControl
+import 'leaflet-draw/dist/leaflet.draw.css'; // Import leaflet-draw CSS
+import * as L from 'leaflet'; // Import Leaflet library
+import { latLngsToGeoJSON } from "./geoUtils"; // Assuming this utility is correct
 import './Map.css';
-
 
 // Custom hook for drawing polygons (remains the same)
 function DrawingHandler({ onPolygonComplete, onStopAndSave, isDrawing, setIsDrawing }) {
   const [currentPath, setCurrentPath] = useState([]);
   const [hoveredPoint, setHoveredPoint] = useState(null);
-  const [showMenu, setShowMenu] = useState(false); // This state is local to DrawingHandler, likely not intended to control global menu
-  const [activeSection, setActiveSection] = useState(''); // This state is local to DrawingHandler, likely not intended to control global active section
-  const navigate = useNavigate();
   const location = useLocation();
 
-  // Consider if activeSection and showMenu should be managed higher up if they control the main app navigation/menu.
-  React.useEffect(() => {
-    // Обновляем активный раздел при смене пути
-    if (location.pathname === '/') setActiveSection('home');
-    else if (location.pathname === '/dashboard') setActiveSection('map');
-    else if (location.pathname === '/chat') setActiveSection('ai-chat');
-    else if (location.pathname === '/earthdata') setActiveSection('soil-data');
-  }, [location.pathname]);
-
-  useEffect(() => {
-  const handleClickOutside = (event) => {
-    if (!event.target.closest('.burger-menu')) {
-      setShowMenu(false);
-    }
-  };
-
-  document.addEventListener('click', handleClickOutside);
-  return () => {
-    document.removeEventListener('click', handleClickOutside);
-  };
-}, []);
-  
-  // Expose current path to parent component
+  // Expose current path to parent component (still useful for manual stop and save)
   React.useEffect(() => {
     if (onStopAndSave) {
       window.getCurrentPath = () => currentPath;
@@ -90,23 +69,8 @@ function DrawingHandler({ onPolygonComplete, onStopAndSave, isDrawing, setIsDraw
   return null;
 }
 
-// Ensure this style is consistent or removed if not needed for burger menu buttons
-// const menuBtnStyle = (active) => ({
-//   display: 'block',
-//   width: '100%',
-//   padding: '10px 16px',
-//   textAlign: 'left',
-//   backgroundColor: active ? '#e0f2fe' : 'white',
-//   border: 'none',
-//   borderBottom: '1px solid #ddd',
-//   cursor: 'pointer',
-//   fontWeight: active ? 'bold' : 'normal',
-//   transition: 'background-color 0.2s ease',
-// });
-
-
 export default function PolygonDrawMap() {
-  const [activeSection, setActiveSection] = useState('home'); // This should control the main app active section
+  const [activeSection, setActiveSection] = useState('home');
   const navigate = useNavigate();
   const [polygons, setPolygons] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -114,8 +78,35 @@ export default function PolygonDrawMap() {
   const [crops, setCrops] = useState([]);
   const [loadingCrops, setLoadingCrops] = useState(false);
   const [cropsError, setCropsError] = useState(null);
-  const [showMenu, setShowMenu] = useState(false); // ✅ Correctly placed for the main component's burger menu
+  const [showMenu, setShowMenu] = useState(false); 
   const mapRef = useRef(null);
+
+  // State for editing
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingPolygon, setEditingPolygon] = useState(null); // This will hold the polygon object being edited
+  const editableFGRef = useRef(); // Reference to FeatureGroup for EditControl
+
+  // Effect for handling burger menu click outside (moved from DrawingHandler)
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.burger-menu')) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  // Effect for updating active section based on path (moved from DrawingHandler)
+  useEffect(() => {
+    if (location.pathname === '/') setActiveSection('home');
+    else if (location.pathname === '/dashboard') setActiveSection('map'); // Assuming '/dashboard' is for the map
+    else if (location.pathname === '/chat') setActiveSection('ai-chat');
+    else if (location.pathname === '/earthdata') setActiveSection('soil-data');
+  }, [location.pathname]);
 
   const handleNavigate = (path, section) => {
     setShowMenu(false);
@@ -129,7 +120,6 @@ export default function PolygonDrawMap() {
     navigate('/login'); // Example: redirect to login
   };
 
-  // Function to fetch crop list from Wikipedia API (remains the same)
   const fetchCropsFromAPI = async () => {
     setLoadingCrops(true);
     setCropsError(null);
@@ -174,7 +164,7 @@ export default function PolygonDrawMap() {
           'Перец', 'Баклажаны', 'Кабачки', 'Тыква', 'Редис', 'Петрушка', 'Укроп', 'Салат',
           'Шпинат', 'Брокколи', 'Цветная капуста', 'Брюссельская капуста', 'и не только',
         ];
-        setCrops(fallbackCres);
+        setCrops(fallbackCrops);
       }
     } catch (error) {
       console.error('Ошибка при загрузке культур:', error);
@@ -190,7 +180,7 @@ export default function PolygonDrawMap() {
     setLoadingCrops(false);
   };
 
-  // Load crops on first render (remains the same)
+  // Load crops on first render
   useEffect(() => {
     fetchCropsFromAPI();
   }, []);
@@ -286,6 +276,77 @@ export default function PolygonDrawMap() {
     return `${(area / 1000000).toFixed(1)} км²`;
   };
 
+  // --- Polygon Editing Logic (Moved and Centralized) ---
+  const handleEditPolygon = useCallback((polygonId) => {
+    const polygonToEdit = polygons.find((p) => p.id === polygonId);
+    if (!polygonToEdit) return;
+
+    // Remove any existing layers from the editable feature group
+    editableFGRef.current.clearLayers();
+
+    // Add the polygon to be edited to the FeatureGroup
+    const leafletPolygon = L.polygon(polygonToEdit.coordinates);
+    editableFGRef.current.addLayer(leafletPolygon);
+
+    // Set the state for editing
+    setEditingPolygon(polygonToEdit);
+    setIsEditing(true);
+
+    // Programmatically enable editing for the added layer
+    if (leafletPolygon.editing) {
+      leafletPolygon.editing.enable();
+    }
+  }, [polygons]); // Re-create if polygons change
+
+  const onPolygonEdited = useCallback(async (e) => {
+    const editedLayers = e.layers;
+    editedLayers.eachLayer(async (layer) => {
+      const geoJson = layer.toGeoJSON();
+      // leaflet-draw returns coordinates as [lng, lat] for GeoJSON,
+      // so we convert back to [lat, lng] for our internal state
+      const updatedCoords = geoJson.geometry.coordinates[0].map(coord => [coord[1], coord[0]]); 
+
+      const updatedPolygon = {
+        ...editingPolygon, // Use the stored editingPolygon
+        coordinates: updatedCoords,
+        geoJson: geoJson, // Store the GeoJSON if needed
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Update state
+      setPolygons((prev) =>
+        prev.map(p => p.id === updatedPolygon.id ? updatedPolygon : p)
+      );
+
+      // Save to DB (assuming you have a token and endpoint)
+      // Make sure 'token' is accessible here (e.g., passed as prop, from context, or global state)
+      const token = 'YOUR_AUTH_TOKEN'; // Replace with actual token retrieval
+      try {
+        await fetch(`/api/v1/polygons/${updatedPolygon.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: updatedPolygon.name, // Assuming name and crop are part of your polygon structure
+            crop: updatedPolygon.crop,
+            geometry: updatedPolygon.geoJson // Send the GeoJSON for the database
+          }),
+        });
+        console.log(`Polygon ${updatedPolygon.id} updated in DB.`);
+      } catch (error) {
+        console.error('Error saving edited polygon to DB:', error);
+      }
+    });
+
+    // Reset editing state
+    setIsEditing(false);
+    setEditingPolygon(null);
+    editableFGRef.current.clearLayers(); // Clear the editable layer after save
+  }, [editingPolygon, setPolygons]); // Re-create if editingPolygon or setPolygons changes
+
+  // Styles (remain the same)
   const containerStyle = {
     position: 'fixed',
     top: 0,
@@ -297,15 +358,15 @@ export default function PolygonDrawMap() {
     padding: 0,
     margin: 0,
     maxWidth: 'none',
-    display: 'flex', // Added to manage map and sidebar side-by-side
-    flexDirection: 'row', // Added for map and sidebar layout
+    display: 'flex',
+    flexDirection: 'row',
   };
 
   const mapContainerStyle = {
-    flex: 1, // Allows map to take available space
+    flex: 1,
     height: '100%',
     position: 'relative',
-    width: '100%', // Will be overridden by flex: 1
+    width: '100%',
   };
 
   const sidebarStyle = {
@@ -320,113 +381,125 @@ export default function PolygonDrawMap() {
 
   return (
     <div style={containerStyle}> 
-    {/* This is the single root element */}
-      {/* Map and sidebar container (this now contains everything else) */}
-      {/* The original 'height: 100vh, display: flex, flexDirection: row' is moved to containerStyle */}
-      
-        {/* Map Container */}
-        <div style={mapContainerStyle}>
-          <MapContainer
-            center={[43.2567, 76.9286]}
-            zoom={13}
-            style={{ height: '100%' }}
-            ref={mapRef}
-          >
-            <TileLayer
-              attribution="&copy; Google"
-              url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-            />
+      <div style={mapContainerStyle}>
+        <MapContainer
+          center={[43.2567, 76.9286]}
+          zoom={13}
+          style={{ height: '100%' }}
+          ref={mapRef}
+        >
+          <TileLayer
+            attribution="&copy; Google"
+            url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+          />
 
-            {/* Drawing handler */}
-            <DrawingHandler
-              onPolygonComplete={onPolygonComplete}
-              onStopAndSave={stopAndSaveDrawing}
-              isDrawing={isDrawing}
-              setIsDrawing={setIsDrawing}
-            />
+          {/* Drawing handler */}
+          <DrawingHandler
+            onPolygonComplete={onPolygonComplete}
+            onStopAndSave={stopAndSaveDrawing}
+            isDrawing={isDrawing}
+            setIsDrawing={setIsDrawing}
+          />
 
-            {/* Render existing polygons */}
-            {polygons.map((polygon) => (
+          {/* FeatureGroup for editing control */}
+          <FeatureGroup ref={editableFGRef}>
+            <EditControl
+  position="topright"
+  onEdited={onPolygonEdited}
+  draw={{ rectangle: false, polyline: false, circle: false, marker: false, circlemarker: false }}
+  edit={{
+    // Опции для редактирования
+    featureGroup: editableFGRef.current, // Указываем FeatureGroup, которым управляет EditControl
+    // Ниже можно добавить опции стилизации или поведения, например:
+    // selectedPathOptions: {
+    //   dashArray: '10, 10',
+    //   weight: 4,
+    //   color: '#0000ff'
+    // },
+    // poly: { allowIntersection: false }, // Пример дополнительной опции
+  }}
+/>
+            {/* Render existing polygons here, outside EditControl, unless they are the ones being edited by leaflet-draw */}
+            {polygons.map((p) => (
               <Polygon
-                key={polygon.id}
-                positions={polygon.coordinates}
+                key={p.id}
+                positions={p.coordinates}
                 pathOptions={{
-                  color: polygon.color,
-                  fillOpacity: selectedPolygon === polygon.id ? 0.6 : 0.3,
-                  weight: selectedPolygon === polygon.id ? 3 : 2,
+                  color: p.color,
+                  fillOpacity: selectedPolygon === p.id ? 0.6 : 0.3,
+                  weight: selectedPolygon === p.id ? 3 : 2,
                 }}
                 eventHandlers={{
-                  click: () => setSelectedPolygon(polygon.id),
+                  click: () => setSelectedPolygon(p.id),
                 }}
               />
             ))}
-          </MapContainer>
+          </FeatureGroup>
+        </MapContainer>
 
-                    <div className="map-sidebar">
-            <button
-              onClick={() => handleNavigate('/', 'home')}
-              className={`map-sidebar-button ${activeSection === 'home' ? 'active' : ''}`}
-            >
-              🏠 Главная
-            </button>
-            <button
-              onClick={() => handleNavigate('/chat', 'ai-chat')}
-              className={`map-sidebar-button ${activeSection === 'ai-chat' ? 'active' : ''}`}
-            >
-              🤖 ИИ-чат
-            </button>
-            <button
-              onClick={() => handleNavigate('/earthdata', 'soil-data')}
-              className={`map-sidebar-button ${activeSection === 'soil-data' ? 'active' : ''}`}
-            >
-              🌱 Данные почвы
-            </button>
-            <button
-              onClick={handleLogout}
-              className="map-sidebar-button"
-            >
-              🚪 Выйти
-            </button>
+        <div className="map-sidebar">
+          <button
+            onClick={() => handleNavigate('/', 'home')}
+            className={`map-sidebar-button ${activeSection === 'home' ? 'active' : ''}`}
+          >
+            🏠 Главная
+          </button>
+          <button
+            onClick={() => handleNavigate('/chat', 'ai-chat')}
+            className={`map-sidebar-button ${activeSection === 'ai-chat' ? 'active' : ''}`}
+          >
+            🤖 ИИ-чат
+          </button>
+          <button
+            onClick={() => handleNavigate('/earthdata', 'soil-data')}
+            className={`map-sidebar-button ${activeSection === 'soil-data' ? 'active' : ''}`}
+          >
+            🌱 Данные почвы
+          </button>
+          <button
+            onClick={handleLogout}
+            className="map-sidebar-button"
+          >
+            🚪 Выйти
+          </button>
 
-            <hr style={{ border: 'none', height: '1px', background: '#555', margin: '12px 0' }} />
+          <hr style={{ border: 'none', height: '1px', background: '#555', margin: '12px 0' }} />
 
-            <button
-              onClick={startDrawing}
-              disabled={isDrawing}
-              className="map-sidebar-button draw"
-            >
-              {isDrawing ? '✏️ Рисую...' : '✏️ Начать рисование'}
-            </button>
+          <button
+            onClick={startDrawing}
+            disabled={isDrawing}
+            className="map-sidebar-button draw"
+          >
+            {isDrawing ? '✏️ Рисую...' : '✏️ Начать рисование'}
+          </button>
 
-            <button
-              onClick={() => {
-                if (window.getCurrentPath) {
-                  const currentPath = window.getCurrentPath();
-                  stopAndSaveDrawing(currentPath);
-                  if (window.clearCurrentPath) window.clearCurrentPath();
-                } else {
-                  stopDrawing();
-                }
-              }}
-              disabled={!isDrawing}
-              className="map-sidebar-button stop"
-            >
-              💾 Остановить и сохранить
-            </button>
+          <button
+            onClick={() => {
+              if (window.getCurrentPath) {
+                const currentPath = window.getCurrentPath();
+                stopAndSaveDrawing(currentPath);
+                if (window.clearCurrentPath) window.clearCurrentPath();
+              } else {
+                stopDrawing();
+              }
+            }}
+            disabled={!isDrawing}
+            className="map-sidebar-button stop"
+          >
+            💾 Остановить и сохранить
+          </button>
 
-            <button
-              onClick={clearAll}
-              className="map-sidebar-button clear"
-            >
-              🗑️ Очистить все
-            </button>
-          </div>
+          <button
+            onClick={clearAll}
+            className="map-sidebar-button clear"
+          >
+            🗑️ Очистить все
+          </button>
+        </div>
 
 
-        {/* Sidebar with polygons and crops (now correctly inside the main container) */}
         {polygons.length > 0 && (
           <div style={sidebarStyle}>
-            {/* Polygons section */}
             <div style={{ marginBottom: '20px' }}>
               <h3 style={{ margin: '0 0 15px 0', color: '#333', fontSize: '18px' }}>
                 📐 Полигоны ({polygons.length})
@@ -479,6 +552,24 @@ export default function PolygonDrawMap() {
                       >
                         Удалить
                       </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent polygon selection
+                          handleEditPolygon(polygon.id);
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: '#ffc107',
+                          color: '#000',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                        }}
+                      >
+                        ✏️ Редактировать
+                      </button>
                     </div>
 
                     <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
@@ -524,7 +615,6 @@ export default function PolygonDrawMap() {
               </div>
             </div>
 
-            {/* Crops assignment section */}
             <div
               style={{
                 backgroundColor: '#fff',
@@ -669,7 +759,6 @@ export default function PolygonDrawMap() {
                   </div>
                 ))}
 
-                {/* Summary */}
                 <div
                   style={{
                     marginTop: '15px',
@@ -698,7 +787,6 @@ export default function PolygonDrawMap() {
                     </div>
                   </div>
 
-                  {/* Breakdown by crops */}
                   {polygons.some((p) => p.crop) && (
                     <div style={{ marginTop: '10px' }}>
                       <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>По культурам:</div>
@@ -734,37 +822,36 @@ export default function PolygonDrawMap() {
           </div>
         )}
 
-      {/* Drawing instructions (now correctly inside the main container and positioned absolutely) */}
-      {isDrawing && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '15px',
-            left: '15px',
-            backgroundColor: 'rgba(0,0,0,0.85)',
-            color: 'white',
-            padding: '15px',
-            borderRadius: '8px',
-            fontSize: '14px',
-            zIndex: 1000,
-            maxWidth: '320px',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
-          }}
-        >
+        {isDrawing && (
           <div
-            style={{ fontWeight: 'bold', marginBottom: '8px', color: '#4CAF50' }}
+            style={{
+              position: 'absolute',
+              bottom: '15px',
+              left: '15px',
+              backgroundColor: 'rgba(0,0,0,0.85)',
+              color: 'white',
+              padding: '15px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              zIndex: 1000,
+              maxWidth: '320px',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+            }}
           >
-            📍 Режим рисования активен
+            <div
+              style={{ fontWeight: 'bold', marginBottom: '8px', color: '#4CAF50' }}
+            >
+              📍 Режим рисования активен
+            </div>
+            <div style={{ lineHeight: '1.4' }}>
+              <div>• Кликайте для добавления точек</div>
+              <div>• Двойной клик для автозавершения</div>
+              <div>• "Остановить и сохранить" для ручного завершения</div>
+              <div>• Минимум 3 точки для полигона</div>
+            </div>
           </div>
-          <div style={{ lineHeight: '1.4' }}>
-            <div>• Кликайте для добавления точек</div>
-            <div>• Двойной клик для автозавершения</div>
-            <div>• "Остановить и сохранить" для ручного завершения</div>
-            <div>• Минимум 3 точки для полигона</div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-    /</div>
   );
 }
