@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import axios from 'axios';
 
@@ -19,24 +19,29 @@ function AgroDashboard() {
   const [error, setError] = useState('');
 
   const fetchData = () => {
-  setLoading(true);
-  setError('');
-  const endpoint = mode === 'weather' ? '/api/weather' : '/api/soil'; // Выбор эндпоинта
-  axios
-    .get(`${import.meta.env.VITE_API_URL}${endpoint}`, { withCredentials: true }) // credentials если включено CORS с куками
-    .then((res) => {
-      if (mode === 'weather') {
-        setWeather(res.data);
-        setSoil(null);
-      } else {
-        setSoil(res.data);
-        setWeather(null);
-      }
-    })
-    .catch(() => setError('Ошибка при загрузке данных'))
-    .finally(() => setLoading(false));
-};
+    setLoading(true);
+    setError('');
+    const endpoint = mode === 'weather' ? '/api/weather' : '/api/soil';
 
+    axios
+      .get(`${import.meta.env.VITE_API_URL}${endpoint}`, {
+        withCredentials: true,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      .then((res) => {
+        if (mode === 'weather') {
+          setWeather(res.data);
+          setSoil(null);
+        } else {
+          setSoil(res.data);
+          setWeather(null);
+        }
+      })
+      .catch(() => setError('Ошибка при загрузке данных'))
+      .finally(() => setLoading(false));
+  };
 
   const kelvinToCelsius = (k) => (k - 273.15).toFixed(1);
 
@@ -52,9 +57,7 @@ function AgroDashboard() {
               <p>Облачность: {weather.weather[0].description}</p>
               <p>Давление: {weather.main.pressure} гПа</p>
               <p>Влажность: {weather.main.humidity} %</p>
-              <p>
-                Ветер: {weather.wind.speed} м/с, направление: {weather.wind.deg}°
-              </p>
+              <p>Ветер: {weather.wind.speed} м/с, направление: {weather.wind.deg}°</p>
               <p>Видимость: {weather.visibility / 1000} км</p>
             </div>
           )}
@@ -66,7 +69,7 @@ function AgroDashboard() {
                 border: '1px solid #8b4513',
                 padding: 15,
                 borderRadius: 8,
-                backgroundColor: '#f5f5dc',
+                backgroundColor: '#f5f5dc'
               }}
             >
               <h2>🌱 Состояние почвы</h2>
@@ -84,7 +87,7 @@ function AgroDashboard() {
             borderRadius: 8,
             overflow: 'hidden',
             boxShadow: '0 0 12px rgba(0,0,0,0.1)',
-            flex: '1 1 60%',
+            flex: '1 1 60%'
           }}
         >
           <Map />
@@ -95,25 +98,32 @@ function AgroDashboard() {
 }
 
 function App() {
-  const [showRegistration, setShowRegistration] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const handleRegistrationSuccess = () => {
-    setShowRegistration(false);
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    setIsAuthenticated(!!token);
+  }, []);
+
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
   };
 
-  const handleSettingsClick = () => {
-    alert('Открыть настройки пользователя');
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setIsAuthenticated(false);
   };
 
   return (
     <Router>
-      {showRegistration ? (
-        <RegistrationModal onSuccess={handleRegistrationSuccess} />
+      {!isAuthenticated ? (
+        <RegistrationModal onSuccess={handleLoginSuccess} />
       ) : (
         <>
-          <ProfileHeader onSettingsClick={handleSettingsClick} />
+          <ProfileHeader onLogout={handleLogout} />
+
           <Routes>
-            <Route path="/register" element={<RegistrationModal />} />
+            <Route path="/register" element={<RegistrationModal onSuccess={handleLoginSuccess} />} />
             <Route path="/login" element={<Login />} />
             <Route path="/home" element={<Home />} />
             <Route path="/dashboard" element={<AgroDashboard />} />

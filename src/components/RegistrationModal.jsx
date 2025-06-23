@@ -23,9 +23,7 @@ export default function RegistrationModal({ onClose, onSuccess }) {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      setIsRegistered(true);
-    }
+    if (token) setIsRegistered(true);
 
     const container = document.querySelector('.registration-modal');
     if (!container) return;
@@ -67,17 +65,15 @@ export default function RegistrationModal({ onClose, onSuccess }) {
     }
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/register', {
+      const response = await fetch('https://newback-production-aa83.up.railway.app/api/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username: login, email, password }),
+        body: JSON.stringify({ username: login, email, password })
       });
 
-      const result = await response.json();
-
+      const result = await response.text();
       if (!response.ok) {
-        setError(result.message || "Ошибка регистрации");
+        setError(result || "Ошибка регистрации");
         return;
       }
 
@@ -93,33 +89,22 @@ export default function RegistrationModal({ onClose, onSuccess }) {
     e.preventDefault();
     setError("");
 
-    if (!login.trim() || !password) {
-      setError("Введите логин и пароль");
+    if (!email.trim() || !password) {
+      setError("Введите email и пароль");
       return;
     }
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/login", {
+      const response = await fetch("https://newback-production-aa83.up.railway.app/api/v1/auth/login", {
         method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({
-          username: login,
-          password: password,
-          "remember-me": keepMeLoggedIn ? "true" : "false"
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email,
+          password: password
         })
       });
 
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = { message: text };
-      }
-
+      const data = await response.json();
       if (!response.ok) {
         setError(data.message || "Ошибка входа");
         return;
@@ -137,39 +122,90 @@ export default function RegistrationModal({ onClose, onSuccess }) {
     }
   }
 
-  function handleRecoverPassword(e) {
+  async function handleRecoverPassword(e) {
     e.preventDefault();
     setError("");
 
-    if (recoveryStep === 1) {
-      if (recoveryCode.trim().length !== 6) {
-        setError("Введите корректный код (6 символов)");
-        return;
+    if (!email.trim()) {
+      setError("Введите email");
+      return;
+    }
+
+    try {
+      if (recoveryStep === 1) {
+        // verify code
+        const response = await fetch("https://newback-production-aa83.up.railway.app/api/v1/recovery/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, code: recoveryCode })
+        });
+
+        if (!response.ok) {
+          const data = await response.text();
+          setError(data || "Неверный код");
+          return;
+        }
+
+        setRecoveryStep(2);
+      } else if (recoveryStep === 2) {
+        if (newPassword !== repeatNewPassword) {
+          setError("Пароли не совпадают");
+          return;
+        }
+
+        const response = await fetch("https://newback-production-aa83.up.railway.app/api/v1/recovery/reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, newPassword })
+        });
+
+        if (!response.ok) {
+          const data = await response.text();
+          setError(data || "Ошибка смены пароля");
+          return;
+        }
+
+        alert("Пароль успешно обновлён!");
+        setIsRecovering(false);
+        setRecoveryStep(0);
+        setRecoveryCode("");
+        setNewPassword("");
+        setRepeatNewPassword("");
       }
-      setRecoveryStep(2);
-    } else if (recoveryStep === 2) {
-      if (newPassword.length < 6) {
-        setError("Пароль должен содержать минимум 6 символов");
-        return;
-      }
-      if (newPassword !== repeatNewPassword) {
-        setError("Пароли не совпадают");
-        return;
-      }
-      alert("Пароль успешно обновлён!");
-      setIsRecovering(false);
-      setRecoveryStep(0);
-      setRecoveryCode("");
-      setNewPassword("");
-      setRepeatNewPassword("");
+    } catch (err) {
+      console.error("Ошибка восстановления:", err);
+      setError("Сервер недоступен");
     }
   }
 
-  function startRecovery() {
-    setIsRecovering(true);
-    setRecoveryStep(1);
+  async function startRecovery() {
     setError("");
-    alert("Код восстановления отправлен на почту.");
+
+    if (!email.trim()) {
+      setError("Введите email для восстановления");
+      return;
+    }
+
+    try {
+      const response = await fetch("https://newback-production-aa83.up.railway.app/api/v1/recovery/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+
+      if (!response.ok) {
+        const data = await response.text();
+        setError(data || "Ошибка при отправке письма");
+        return;
+      }
+
+      alert("Код восстановления отправлен на почту.");
+      setIsRecovering(true);
+      setRecoveryStep(1);
+    } catch (err) {
+      console.error("Ошибка восстановления:", err);
+      setError("Сервер недоступен");
+    }
   }
 
   if (isRegistered) return <Map />;
@@ -212,7 +248,7 @@ export default function RegistrationModal({ onClose, onSuccess }) {
           {isLoginMode && !isRecovering && (
             <form className="registration-form" onSubmit={handleLogin}>
               <div className="input-group">
-                <input type="text" placeholder="Username" value={login} onChange={(e) => setLogin(e.target.value)} required />
+                <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div className="input-group">
                 <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
@@ -221,7 +257,7 @@ export default function RegistrationModal({ onClose, onSuccess }) {
                 <input type="checkbox" checked={keepMeLoggedIn} onChange={(e) => setKeepMeLoggedIn(e.target.checked)} />
                 <span className="checkmark"></span> Keep me logged in
               </label>
-              <div className="forgot-password" onClick={startRecovery} style={{ cursor: 'pointer', color: 'blue', marginTop: '8px' }}>
+              <div className="forgot-password" onClick={startRecovery} style={{ cursor: 'pointer', color: '##ff8c42', marginTop: '8px' }}>
                 Forgot password?
               </div>
               {error && <div className="error">{error}</div>}

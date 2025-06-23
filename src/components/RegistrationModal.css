@@ -54,6 +54,10 @@
   }
 }
 
+.forgot-password {
+  color: #fff;
+}
+
 /* Основной контейнер */
 .registration-wrapper {
   position: relative;
