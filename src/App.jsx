@@ -4,7 +4,6 @@ import axios from 'axios';
 
 import Home from './pages/Home';
 import MainPage from './components/MainPage';
-import Login from './components/Login';
 import EarthData from './components/EarthData';
 import RegistrationModal from './components/RegistrationModal';
 import ProfileHeader from './components/ProfileHeader';
@@ -124,7 +123,6 @@ function App() {
 
           <Routes>
             <Route path="/register" element={<RegistrationModal onSuccess={handleLoginSuccess} />} />
-            <Route path="/login" element={<Login />} />
             <Route path="/home" element={<Home />} />
             <Route path="/dashboard" element={<AgroDashboard />} />
             <Route path="/earthdata" element={<EarthData />} />

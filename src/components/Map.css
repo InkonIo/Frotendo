@@ -214,6 +214,75 @@
   overflow: auto;
 }
 
+/* style for hamburger button */
+
+.map-sidebar {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  background: transparent; /* светло-серый прозрачный */
+  padding: 12px;
+  z-index: 999;
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(0,0,0,0.2);
+  min-width: 180px;
+  backdrop-filter: blur(29px); /* для мягкости */
+}
+
+.map-sidebar-button {
+  background: transparent;
+  border: none;
+  color: #333;
+  text-align: left;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.map-sidebar-button:hover {
+  color: #FF8C42;
+}
+
+.map-sidebar-button.active {
+  color: #FF8C42;
+  border-bottom: 2px solid #FF8C42;
+}
+
+.map-sidebar-button.draw {
+  background-color: #4CAF50;
+  color: white;
+  border-radius: 6px;
+}
+
+.map-sidebar-button.draw:disabled {
+  background-color: #888;
+  cursor: not-allowed;
+}
+
+.map-sidebar-button.stop {
+  background-color: #f44336;
+  color: white;
+  border-radius: 6px;
+}
+
+.map-sidebar-button.stop:disabled {
+  background-color: #888;
+  cursor: not-allowed;
+}
+
+.map-sidebar-button.clear {
+  background-color: #ff9800;
+  color: white;
+  border-radius: 6px;
+}
+
+
 /* Crops section */
 .crops-section {
   margin-top: 15px;
