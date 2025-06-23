@@ -1,0 +1,28 @@
+.instructions {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  font-size: 14px;
+  max-width: 280px;
+  z-index: 1000;
+}
+
+.instructions h4 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 16px;
+  color: #333;
+}
+
+.instructions ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.instructions li {
+  margin-bottom: 6px;
+}

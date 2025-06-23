@@ -1,0 +1,45 @@
+.controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.controls button {
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.controls button:hover {
+  background-color: #f0f0f0;
+  transform: translateY(-1px);
+}
+
+.controls button.stop {
+  background-color: #28a745;
+  color: white;
+  border-color: #28a745;
+}
+
+.controls button.stop:hover {
+  background-color: #218838;
+}
+
+.controls button.clear {
+  background-color: #dc3545;
+  color: white;
+  border-color: #dc3545;
+}
+
+.controls button.clear:hover {
+  background-color: #c82333;
+}

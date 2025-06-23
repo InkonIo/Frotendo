@@ -9,7 +9,7 @@ import EarthData from './components/EarthData';
 import RegistrationModal from './components/RegistrationModal';
 import ProfileHeader from './components/ProfileHeader';
 import Chat from './components/Chat';
-import Map from './components/Map';
+import Map from './components/ForMap/Map';
 
 function AgroDashboard() {
   const [mode, setMode] = useState('weather');

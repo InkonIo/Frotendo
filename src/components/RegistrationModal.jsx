@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Map from "./Map";
+import Map from "./ForMap/Map";
 import './RegistrationModal.css';
 
 export default function RegistrationModal({ onClose, onSuccess }) {

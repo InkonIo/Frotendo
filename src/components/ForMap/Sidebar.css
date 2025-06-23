@@ -1,0 +1,31 @@
+.sidebar {
+  width: 280px;
+  background-color: #ffffff;
+  padding: 16px;
+  border-left: 1px solid #ddd;
+  overflow-y: auto;
+}
+
+.sidebar h3 {
+  margin-top: 0;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar li {
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.sidebar li.selected {
+  font-weight: bold;
+  color: #28a745;
+}
+
+.crop-select {
+  margin-top: 8px;
+  width: 100%;
+}

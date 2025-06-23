@@ -1,0 +1,120 @@
+/* Карта и контейнеры */
+.map-wrapper {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  position: relative;
+  background: #f8f9fa;
+  position: relative;
+  height: calc(100vh - 50px);
+    transform: translateY(50px); /* ← визуально смещает вниз */
+  transition: transform 0.3s ease;
+}
+
+.map-wrapper.fullscreen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 999;
+}
+
+.map-sidebar-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.map-container {
+  flex: 1;
+  height: 100%;
+  position: relative;
+  z-index: 0;
+}
+
+/* Панель управления */
+.map-controls {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 1000;
+}
+
+.map-controls button {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border: none;
+  border-radius: 6px;
+  background: #007bff;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.map-controls button:hover {
+  background: #0056b3;
+}
+
+/* Инструкции */
+.map-instructions {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  z-index: 1000;
+}
+
+/* Боковая панель */
+.map-sidebar {
+  width: 300px;
+  background: #ffffff;
+  border-left: 1px solid #ddd;
+  overflow-y: auto;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.map-sidebar h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.map-polygon-item {
+  border-bottom: 1px solid #eee;
+  padding: 0.5rem 0;
+  cursor: pointer;
+}
+
+.map-polygon-item.active {
+  background: #f1f1f1;
+}
+
+.map-polygon-item:hover {
+  background: #f9f9f9;
+}
+
+.map-crop-select {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.map-sidebar button {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+  border: none;
+  background: #dc3545;
+  color: #fff;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.map-sidebar button:hover {
+  background: #c82333;
+}
