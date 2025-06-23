@@ -252,15 +252,12 @@ export default function PolygonDrawMap() {
     padding: '0 10px'
   };
 
-  const mapContainerStyle = isFullscreen ? {
-    width: polygons.length > 0 ? '70%' : '100%',
-    height: '100vh',
-    position: 'relative'
-  } : {
-    width: polygons.length > 0 ? '60%' : '100%',
-    height: '500px',
-    position: 'relative'
-  };
+  const mapContainerStyle = {
+  flex: 1,
+  height: '100%',
+  position: 'relative',
+  width: isFullscreen ? '100%' : undefined
+};
 
   const sidebarStyle = isFullscreen ? {
     width: '30%',
